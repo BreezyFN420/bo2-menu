@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="Plutonium T6/Plutonium T6.vcxproj" Id="90daa680-05b4-478f-b9f2-238f32a0ec1f" />
+</Solution>
