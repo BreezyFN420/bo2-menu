@@ -1,186 +1,112 @@
-/*
- *  MinHook - The Minimalistic API Hooking Library for x64/x86
- *  Copyright (C) 2009-2017 Tsuda Kageyu.
- *  All rights reserved.
+﻿/*
+ * Hacker Disassembler Engine 64
+ * Copyright (c) 2008-2009, Vyacheslav Patkov.
+ * All rights reserved.
  *
- *  Redistribution and use in source and binary forms, with or without
- *  modification, are permitted provided that the following conditions
- *  are met:
+ * hde64.h: C/C++ header file
  *
- *   1. Redistributions of source code must retain the above copyright
- *      notice, this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright
- *      notice, this list of conditions and the following disclaimer in the
- *      documentation and/or other materials provided with the distribution.
- *
- *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
- *  TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
- *  PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER
- *  OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- *  EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- *  PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- *  LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- *  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- *  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma once
+#ifndef _HDE64_H_
+#define _HDE64_H_
 
-#if !(defined _M_IX86) && !(defined _M_X64) && !(defined __i386__) && !(defined __x86_64__)
-    #error MinHook supports only x86 and x64 systems.
-#endif
+/* stdint.h - C99 standard header
+ * http://en.wikipedia.org/wiki/stdint.h
+ *
+ * if your compiler doesn't contain "stdint.h" header (for
+ * example, Microsoft Visual C++), you can download file:
+ *   http://www.azillionmonkeys.com/qed/pstdint.h
+ * and change next line to:
+ *   #include "pstdint.h"
+ */
+#include "pstdint.h"
 
-#include <windows.h>
+#define F_MODRM         0x00000001
+#define F_SIB           0x00000002
+#define F_IMM8          0x00000004
+#define F_IMM16         0x00000008
+#define F_IMM32         0x00000010
+#define F_IMM64         0x00000020
+#define F_DISP8         0x00000040
+#define F_DISP16        0x00000080
+#define F_DISP32        0x00000100
+#define F_RELATIVE      0x00000200
+#define F_ERROR         0x00001000
+#define F_ERROR_OPCODE  0x00002000
+#define F_ERROR_LENGTH  0x00004000
+#define F_ERROR_LOCK    0x00008000
+#define F_ERROR_OPERAND 0x00010000
+#define F_PREFIX_REPNZ  0x01000000
+#define F_PREFIX_REPX   0x02000000
+#define F_PREFIX_REP    0x03000000
+#define F_PREFIX_66     0x04000000
+#define F_PREFIX_67     0x08000000
+#define F_PREFIX_LOCK   0x10000000
+#define F_PREFIX_SEG    0x20000000
+#define F_PREFIX_REX    0x40000000
+#define F_PREFIX_ANY    0x7f000000
 
-// MinHook Error Codes.
-typedef enum MH_STATUS
-{
-    // Unknown error. Should not be returned.
-    MH_UNKNOWN = -1,
+#define PREFIX_SEGMENT_CS   0x2e
+#define PREFIX_SEGMENT_SS   0x36
+#define PREFIX_SEGMENT_DS   0x3e
+#define PREFIX_SEGMENT_ES   0x26
+#define PREFIX_SEGMENT_FS   0x64
+#define PREFIX_SEGMENT_GS   0x65
+#define PREFIX_LOCK         0xf0
+#define PREFIX_REPNZ        0xf2
+#define PREFIX_REPX         0xf3
+#define PREFIX_OPERAND_SIZE 0x66
+#define PREFIX_ADDRESS_SIZE 0x67
 
-    // Successful.
-    MH_OK = 0,
+#pragma pack(push,1)
 
-    // MinHook is already initialized.
-    MH_ERROR_ALREADY_INITIALIZED,
+typedef struct {
+    uint8_t len;
+    uint8_t p_rep;
+    uint8_t p_lock;
+    uint8_t p_seg;
+    uint8_t p_66;
+    uint8_t p_67;
+    uint8_t rex;
+    uint8_t rex_w;
+    uint8_t rex_r;
+    uint8_t rex_x;
+    uint8_t rex_b;
+    uint8_t opcode;
+    uint8_t opcode2;
+    uint8_t modrm;
+    uint8_t modrm_mod;
+    uint8_t modrm_reg;
+    uint8_t modrm_rm;
+    uint8_t sib;
+    uint8_t sib_scale;
+    uint8_t sib_index;
+    uint8_t sib_base;
+    union {
+        uint8_t imm8;
+        uint16_t imm16;
+        uint32_t imm32;
+        uint64_t imm64;
+    } imm;
+    union {
+        uint8_t disp8;
+        uint16_t disp16;
+        uint32_t disp32;
+    } disp;
+    uint32_t flags;
+} hde64s;
 
-    // MinHook is not initialized yet, or already uninitialized.
-    MH_ERROR_NOT_INITIALIZED,
-
-    // The hook for the specified target function is already created.
-    MH_ERROR_ALREADY_CREATED,
-
-    // The hook for the specified target function is not created yet.
-    MH_ERROR_NOT_CREATED,
-
-    // The hook for the specified target function is already enabled.
-    MH_ERROR_ENABLED,
-
-    // The hook for the specified target function is not enabled yet, or already
-    // disabled.
-    MH_ERROR_DISABLED,
-
-    // The specified pointer is invalid. It points the address of non-allocated
-    // and/or non-executable region.
-    MH_ERROR_NOT_EXECUTABLE,
-
-    // The specified target function cannot be hooked.
-    MH_ERROR_UNSUPPORTED_FUNCTION,
-
-    // Failed to allocate memory.
-    MH_ERROR_MEMORY_ALLOC,
-
-    // Failed to change the memory protection.
-    MH_ERROR_MEMORY_PROTECT,
-
-    // The specified module is not loaded.
-    MH_ERROR_MODULE_NOT_FOUND,
-
-    // The specified function is not found.
-    MH_ERROR_FUNCTION_NOT_FOUND
-}
-MH_STATUS;
-
-// Can be passed as a parameter to MH_EnableHook, MH_DisableHook,
-// MH_QueueEnableHook or MH_QueueDisableHook.
-#define MH_ALL_HOOKS NULL
+#pragma pack(pop)
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-    // Initialize the MinHook library. You must call this function EXACTLY ONCE
-    // at the beginning of your program.
-    MH_STATUS WINAPI MH_Initialize(VOID);
-
-    // Uninitialize the MinHook library. You must call this function EXACTLY
-    // ONCE at the end of your program.
-    MH_STATUS WINAPI MH_Uninitialize(VOID);
-
-    // Creates a Hook for the specified target function, in disabled state.
-    // Parameters:
-    //   pTarget    [in]  A pointer to the target function, which will be
-    //                    overridden by the detour function.
-    //   pDetour    [in]  A pointer to the detour function, which will override
-    //                    the target function.
-    //   ppOriginal [out] A pointer to the trampoline function, which will be
-    //                    used to call the original target function.
-    //                    This parameter can be NULL.
-    MH_STATUS WINAPI MH_CreateHook(LPVOID pTarget, LPVOID pDetour, LPVOID *ppOriginal);
-
-    // Creates a Hook for the specified API function, in disabled state.
-    // Parameters:
-    //   pszModule  [in]  A pointer to the loaded module name which contains the
-    //                    target function.
-    //   pszTarget  [in]  A pointer to the target function name, which will be
-    //                    overridden by the detour function.
-    //   pDetour    [in]  A pointer to the detour function, which will override
-    //                    the target function.
-    //   ppOriginal [out] A pointer to the trampoline function, which will be
-    //                    used to call the original target function.
-    //                    This parameter can be NULL.
-    MH_STATUS WINAPI MH_CreateHookApi(
-        LPCWSTR pszModule, LPCSTR pszProcName, LPVOID pDetour, LPVOID *ppOriginal);
-
-    // Creates a Hook for the specified API function, in disabled state.
-    // Parameters:
-    //   pszModule  [in]  A pointer to the loaded module name which contains the
-    //                    target function.
-    //   pszTarget  [in]  A pointer to the target function name, which will be
-    //                    overridden by the detour function.
-    //   pDetour    [in]  A pointer to the detour function, which will override
-    //                    the target function.
-    //   ppOriginal [out] A pointer to the trampoline function, which will be
-    //                    used to call the original target function.
-    //                    This parameter can be NULL.
-    //   ppTarget   [out] A pointer to the target function, which will be used
-    //                    with other functions.
-    //                    This parameter can be NULL.
-    MH_STATUS WINAPI MH_CreateHookApiEx(
-        LPCWSTR pszModule, LPCSTR pszProcName, LPVOID pDetour, LPVOID *ppOriginal, LPVOID *ppTarget);
-
-    // Removes an already created hook.
-    // Parameters:
-    //   pTarget [in] A pointer to the target function.
-    MH_STATUS WINAPI MH_RemoveHook(LPVOID pTarget);
-
-    // Enables an already created hook.
-    // Parameters:
-    //   pTarget [in] A pointer to the target function.
-    //                If this parameter is MH_ALL_HOOKS, all created hooks are
-    //                enabled in one go.
-    MH_STATUS WINAPI MH_EnableHook(LPVOID pTarget);
-
-    // Disables an already created hook.
-    // Parameters:
-    //   pTarget [in] A pointer to the target function.
-    //                If this parameter is MH_ALL_HOOKS, all created hooks are
-    //                disabled in one go.
-    MH_STATUS WINAPI MH_DisableHook(LPVOID pTarget);
-
-    // Queues to enable an already created hook.
-    // Parameters:
-    //   pTarget [in] A pointer to the target function.
-    //                If this parameter is MH_ALL_HOOKS, all created hooks are
-    //                queued to be enabled.
-    MH_STATUS WINAPI MH_QueueEnableHook(LPVOID pTarget);
-
-    // Queues to disable an already created hook.
-    // Parameters:
-    //   pTarget [in] A pointer to the target function.
-    //                If this parameter is MH_ALL_HOOKS, all created hooks are
-    //                queued to be disabled.
-    MH_STATUS WINAPI MH_QueueDisableHook(LPVOID pTarget);
-
-    // Applies all queued changes in one go.
-    MH_STATUS WINAPI MH_ApplyQueued(VOID);
-
-    // Translates the MH_STATUS to its name as a string.
-    const char * WINAPI MH_StatusToString(MH_STATUS status);
+/* __cdecl */
+unsigned int hde64_disasm(const void *code, hde64s *hs);
 
 #ifdef __cplusplus
 }
 #endif
 
+#endif /* _HDE64_H_ */

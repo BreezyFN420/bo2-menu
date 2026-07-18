@@ -1,105 +1,105 @@
 ﻿/*
- * Hacker Disassembler Engine 32
- * Copyright (c) 2006-2009, Vyacheslav Patkov.
- * All rights reserved.
+ *  MinHook - The Minimalistic API Hooking Library for x64/x86
+ *  Copyright (C) 2009-2017 Tsuda Kageyu.
+ *  All rights reserved.
  *
- * hde32.h: C/C++ header file
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted provided that the following conditions
+ *  are met:
  *
+ *   1. Redistributions of source code must retain the above copyright
+ *      notice, this list of conditions and the following disclaimer.
+ *   2. Redistributions in binary form must reproduce the above copyright
+ *      notice, this list of conditions and the following disclaimer in the
+ *      documentation and/or other materials provided with the distribution.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ *  TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ *  PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER
+ *  OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ *  EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ *  PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ *  LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ *  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ *  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _HDE32_H_
-#define _HDE32_H_
+#pragma once
 
-/* stdint.h - C99 standard header
- * http://en.wikipedia.org/wiki/stdint.h
- *
- * if your compiler doesn't contain "stdint.h" header (for
- * example, Microsoft Visual C++), you can download file:
- *   http://www.azillionmonkeys.com/qed/pstdint.h
- * and change next line to:
- *   #include "pstdint.h"
- */
-#include "pstdint.h"
+#pragma pack(push, 1)
 
-#define F_MODRM         0x00000001
-#define F_SIB           0x00000002
-#define F_IMM8          0x00000004
-#define F_IMM16         0x00000008
-#define F_IMM32         0x00000010
-#define F_DISP8         0x00000020
-#define F_DISP16        0x00000040
-#define F_DISP32        0x00000080
-#define F_RELATIVE      0x00000100
-#define F_2IMM16        0x00000800
-#define F_ERROR         0x00001000
-#define F_ERROR_OPCODE  0x00002000
-#define F_ERROR_LENGTH  0x00004000
-#define F_ERROR_LOCK    0x00008000
-#define F_ERROR_OPERAND 0x00010000
-#define F_PREFIX_REPNZ  0x01000000
-#define F_PREFIX_REPX   0x02000000
-#define F_PREFIX_REP    0x03000000
-#define F_PREFIX_66     0x04000000
-#define F_PREFIX_67     0x08000000
-#define F_PREFIX_LOCK   0x10000000
-#define F_PREFIX_SEG    0x20000000
-#define F_PREFIX_ANY    0x3f000000
+// Structs for writing x86/x64 instructions.
 
-#define PREFIX_SEGMENT_CS   0x2e
-#define PREFIX_SEGMENT_SS   0x36
-#define PREFIX_SEGMENT_DS   0x3e
-#define PREFIX_SEGMENT_ES   0x26
-#define PREFIX_SEGMENT_FS   0x64
-#define PREFIX_SEGMENT_GS   0x65
-#define PREFIX_LOCK         0xf0
-#define PREFIX_REPNZ        0xf2
-#define PREFIX_REPX         0xf3
-#define PREFIX_OPERAND_SIZE 0x66
-#define PREFIX_ADDRESS_SIZE 0x67
+// 8-bit relative jump.
+typedef struct _JMP_REL_SHORT
+{
+    UINT8  opcode;      // EB xx: JMP +2+xx
+    UINT8  operand;
+} JMP_REL_SHORT, *PJMP_REL_SHORT;
 
-#pragma pack(push,1)
+// 32-bit direct relative jump/call.
+typedef struct _JMP_REL
+{
+    UINT8  opcode;      // E9/E8 xxxxxxxx: JMP/CALL +5+xxxxxxxx
+    UINT32 operand;     // Relative destination address
+} JMP_REL, *PJMP_REL, CALL_REL;
 
-typedef struct {
-    uint8_t len;
-    uint8_t p_rep;
-    uint8_t p_lock;
-    uint8_t p_seg;
-    uint8_t p_66;
-    uint8_t p_67;
-    uint8_t opcode;
-    uint8_t opcode2;
-    uint8_t modrm;
-    uint8_t modrm_mod;
-    uint8_t modrm_reg;
-    uint8_t modrm_rm;
-    uint8_t sib;
-    uint8_t sib_scale;
-    uint8_t sib_index;
-    uint8_t sib_base;
-    union {
-        uint8_t imm8;
-        uint16_t imm16;
-        uint32_t imm32;
-    } imm;
-    union {
-        uint8_t disp8;
-        uint16_t disp16;
-        uint32_t disp32;
-    } disp;
-    uint32_t flags;
-} hde32s;
+// 64-bit indirect absolute jump.
+typedef struct _JMP_ABS
+{
+    UINT8  opcode0;     // FF25 00000000: JMP [+6]
+    UINT8  opcode1;
+    UINT32 dummy;
+    UINT64 address;     // Absolute destination address
+} JMP_ABS, *PJMP_ABS;
+
+// 64-bit indirect absolute call.
+typedef struct _CALL_ABS
+{
+    UINT8  opcode0;     // FF15 00000002: CALL [+6]
+    UINT8  opcode1;
+    UINT32 dummy0;
+    UINT8  dummy1;      // EB 08:         JMP +10
+    UINT8  dummy2;
+    UINT64 address;     // Absolute destination address
+} CALL_ABS;
+
+// 32-bit direct relative conditional jumps.
+typedef struct _JCC_REL
+{
+    UINT8  opcode0;     // 0F8* xxxxxxxx: J** +6+xxxxxxxx
+    UINT8  opcode1;
+    UINT32 operand;     // Relative destination address
+} JCC_REL;
+
+// 64bit indirect absolute conditional jumps that x64 lacks.
+typedef struct _JCC_ABS
+{
+    UINT8  opcode;      // 7* 0E:         J** +16
+    UINT8  dummy0;
+    UINT8  dummy1;      // FF25 00000000: JMP [+6]
+    UINT8  dummy2;
+    UINT32 dummy3;
+    UINT64 address;     // Absolute destination address
+} JCC_ABS;
 
 #pragma pack(pop)
 
-#ifdef __cplusplus
-extern "C" {
+typedef struct _TRAMPOLINE
+{
+    LPVOID pTarget;         // [In] Address of the target function.
+    LPVOID pDetour;         // [In] Address of the detour function.
+    LPVOID pTrampoline;     // [In] Buffer address for the trampoline and relay function.
+
+#if defined(_M_X64) || defined(__x86_64__)
+    LPVOID pRelay;          // [Out] Address of the relay function.
 #endif
+    BOOL   patchAbove;      // [Out] Should use the hot patch area?
+    UINT   nIP;             // [Out] Number of the instruction boundaries.
+    UINT8  oldIPs[8];       // [Out] Instruction boundaries of the target function.
+    UINT8  newIPs[8];       // [Out] Instruction boundaries of the trampoline function.
+} TRAMPOLINE, *PTRAMPOLINE;
 
-/* __cdecl */
-unsigned int hde32_disasm(const void *code, hde32s *hs);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* _HDE32_H_ */
+BOOL CreateTrampolineFunction(PTRAMPOLINE ct);
